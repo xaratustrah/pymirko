@@ -6,7 +6,7 @@ MIRKO post processing tools
 
 """
 
-import sys, os
+import sys, os, argparse
 from subprocess import call
 import numpy as np
 import matplotlib.pyplot as plt
@@ -38,14 +38,14 @@ def create_mak_file(current_idx, generator_filename, n_turns=1):
     final_section = 'close,9\n*\npnul,solb,0,0,0,0,0,-0.009,sync\n'
 
     with open(TEMP_FILENAME, 'w') as f:
-        f.write(header_section.replace(PLACEHOLDER, '{}'.format(idx)))
+        f.write(header_section.replace(PLACEHOLDER, '{}'.format(current_idx)))
         for i in range(n_turns):
             f.write(repeat_section)
             f.write(middle_section)
         f.write(final_section)
 
 
-def get_data_from_resultfile(filename):
+def get_data_from_result_file(filename):
     arr = np.array([])
     filename = filename
     with open(filename) as f:
@@ -74,16 +74,29 @@ def plot_data(arr, filename):
 
 
 def main():
-    try:
-        filename = sys.argv[1]
-    except(IndexError):
-        print('Please provide filename.')
+    parser = argparse.ArgumentParser(prog='pymirko')
+    parser.add_argument('--verbose', action='store_true', help='Increase verbosity.')
+
+    parser.add_argument('--loop', action='store_true', help='Loop MIRKO.')
+    parser.add_argument('--plot', action='store_true', help='Plot results file.')
+    parser.add_argument('filename', nargs=1, type=str, help='Input file name.')
+
+    args = parser.parse_args()
+    # check the first switches
+
+    filename = args.filename[0]
+
+    if args.loop and args.plot:
+        parser.print_help()
         return
 
-    loop_mirko(filename)
-    arr = get_data_from_resultfile(filename)
-    print(arr)
-    # plot_data(arr, filename)
+    if args.loop:
+        loop_mirko(filename)
+
+    if args.plot:
+        arr = get_data_from_result_file(filename)
+        # print(arr)
+        plot_data(arr, filename)
 
 
 # --------------------
