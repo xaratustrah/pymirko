@@ -11,15 +11,17 @@ from subprocess import call
 import numpy as np
 import matplotlib.pyplot as plt
 
-TEMP_FILENAME = 'temp.mak'
-MIRKO = 'java -jar ../../jMirko/dist/jMirko.jar'
-PLACEHOLDER = 'NUMBERPLACEHOLDER'
-EVET_LOOPS = 365
+MIRKO = 'mirko'
+EVET_LOOPS = 2
 N_TURNS = 2
+MIX_FILE = 'origin.mix'
+TEMP_FILENAME = 'temp.mak'
+MIXFILE_PLACEHOLDER = 'MIXFILE_PLACEHOLDER'
+PLACEHOLDER = 'NUMBERPLACEHOLDER'
 
 
 def loop_mirko(generator_filename):
-    for i in range(EVET_LOOPS):
+    for i in range(1, EVET_LOOPS + 1):
         create_mak_file(i, generator_filename, N_TURNS)
         cmd = MIRKO.split()
         cmd.append(TEMP_FILENAME)
@@ -33,12 +35,14 @@ def create_mak_file(current_idx, generator_filename, n_turns=1):
     with open(generator_filename) as f:
         header_section = f.read()
 
-    repeat_section = ''.join('aenv,{},{}\n*'.format(i, i) for i in range(1, 365 + 1))
-    middle_section = 'savs,less,penv,,delp,\n*'
+    repeat_section = ''.join('aenv,{},{}\n*\n'.format(i, i) for i in range(1, 365 + 1))
+    middle_section = 'savs,less,penv,,delp,\n*\n'
     final_section = 'close,9\n*\npnul,solb,0,0,0,0,0,-0.009,sync\n'
 
     with open(TEMP_FILENAME, 'w') as f:
-        f.write(header_section.replace(PLACEHOLDER, '{}'.format(current_idx)))
+        new_head = header_section.replace(PLACEHOLDER, '{}'.format(current_idx)).replace(MIXFILE_PLACEHOLDER,
+                                                                                         '{}'.format(MIX_FILE))
+        f.write(new_head)
         for i in range(n_turns):
             f.write(repeat_section)
             f.write(middle_section)
@@ -54,6 +58,9 @@ def get_data_from_result_file(filename):
             if not len(s) == 6:
                 continue
             try:
+                # todo: element number 355 contains the last coordinate.
+                # todo: element names should be checked with dictionary
+
                 arr = np.append(arr, (int(s[-6]), float(s[-4]), float(s[-3]), float(s[-2]), float(s[-1])))
             except(ValueError, IndexError):
                 pass
@@ -63,9 +70,9 @@ def get_data_from_result_file(filename):
 
 
 def plot_data(arr, filename):
-    plt.plot(arr[:, 0], arr[:, 3], 'b-')
-    plt.plot(arr[:, 0], arr[:, 2], 'g-')
-    plt.plot(arr[:, 0], arr[:, 1], 'r-')
+    plt.plot(arr[:, 1], arr[:, 2], 'r-')
+    plt.plot(arr[:, 1], arr[:, 4], 'b-.')
+    plt.plot(arr[:, 1], arr[:, 3], 'g-')
     plt.grid(True)
     plt.xlabel('Path [mm]')
     plt.ylabel('Offset [mm]')
@@ -97,6 +104,7 @@ def main():
         arr = get_data_from_result_file(filename)
         # print(arr)
         plot_data(arr, filename)
+        np.savetxt('array.txt', arr, delimiter=',')
 
 
 # --------------------
