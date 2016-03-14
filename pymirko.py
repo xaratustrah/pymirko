@@ -10,6 +10,7 @@ import sys, os, argparse
 from subprocess import call
 import numpy as np
 import matplotlib.pyplot as plt
+import fortranformat as ff
 
 MIRKO = 'mirko'
 EVET_LOOPS = 2
@@ -18,6 +19,29 @@ MIX_FILE = 'origin.mix'
 TEMP_FILENAME = 'temp.mak'
 MIXFILE_PLACEHOLDER = 'MIXFILE_PLACEHOLDER'
 PLACEHOLDER = 'NUMBERPLACEHOLDER'
+LAST_RING_ELEMENT = 355
+
+
+def get_apreture_dic():
+    ffline = ff.FortranRecordReader('(3X,a16,3I4,F17.4,F17.10,2F12.3,I4,2x,a16)')
+    dic = {}
+    with open(MIX_FILE) as f:
+        for _ in range(31):
+            next(f)
+        for i in range(355):
+            try:
+                line = f.readline()
+                hh = ffline.read(line)
+                if hh[0].strip() == '':
+                    name = 'DRIFT'
+                else:
+                    name = hh[0].strip()
+                aperture = hh[6]
+                if name not in dic:
+                    dic.update({name: aperture})
+            except:
+                pass
+    return dic
 
 
 def loop_mirko(generator_filename):
@@ -50,29 +74,39 @@ def create_mak_file(current_idx, generator_filename, n_turns=1):
 
 
 def get_data_from_result_file(filename):
+    dic = get_apreture_dic()
     arr = np.array([])
-    filename = filename
+    z_at_end = 0
     with open(filename) as f:
         for line in f:
             s = line.split()
             if not len(s) == 6:
                 continue
             try:
-                # todo: element number 355 contains the last coordinate.
-                # todo: element names should be checked with dictionary
-
-                arr = np.append(arr, (int(s[-6]), float(s[-4]), float(s[-3]), float(s[-2]), float(s[-1])))
-            except(ValueError, IndexError):
+                number = int(s[-6])
+                z = float(s[-4])
+                if number == LAST_RING_ELEMENT:
+                    # this is really cool:
+                    z_at_end += z
+                z_cont = z + z_at_end
+                up = float(s[-3])
+                down = float(s[-2])
+                ref = float(s[-1])
+                # do this one at last, to make advantage of try/except block
+                aperture = dic[s[-5].strip()]
+                arr = np.append(arr, (number, aperture, z, z_cont, up, down, ref))
+            except(ValueError, IndexError, KeyError):
+                # boah!
                 pass
-    arr = np.reshape(arr, (int(len(arr)) / 5, 5))
+    arr = np.reshape(arr, (int(len(arr)) / 7, 7))
 
     return arr
 
 
 def plot_data(arr, filename):
-    plt.plot(arr[:, 1], arr[:, 2], 'r-')
-    plt.plot(arr[:, 1], arr[:, 4], 'b-.')
-    plt.plot(arr[:, 1], arr[:, 3], 'g-')
+    plt.plot(arr[:, 3], arr[:, 4], 'r-')
+    plt.plot(arr[:, 3], arr[:, 5], 'b-.')
+    plt.plot(arr[:, 3], arr[:, 6], 'g-')
     plt.grid(True)
     plt.xlabel('Path [mm]')
     plt.ylabel('Offset [mm]')
@@ -104,7 +138,7 @@ def main():
         arr = get_data_from_result_file(filename)
         # print(arr)
         plot_data(arr, filename)
-        np.savetxt('array.txt', arr, delimiter=',')
+        # np.savetxt('array.txt', arr, delimiter=',')
 
 
 # --------------------
