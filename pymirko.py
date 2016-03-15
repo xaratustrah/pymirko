@@ -13,8 +13,8 @@ import matplotlib.pyplot as plt
 import fortranformat as ff
 
 MIRKO = 'mirko'
-EVET_LOOPS = 2
-N_TURNS = 2
+EVET_LOOPS = 4
+N_TURNS = 4
 MIX_FILE = 'origin.mix'
 TEMP_FILENAME = 'temp.mak'
 MIXFILE_PLACEHOLDER = 'MIXFILE_PLACEHOLDER'
@@ -103,15 +103,30 @@ def get_data_from_result_file(filename):
     return arr
 
 
+def check_particle_loss(arr):
+    for i in range(np.shape(arr)[0]):
+        # check if the particle hits the aperture
+        if arr[i, 4] >= arr[i, 1] or arr[i, 4] < (-1 * arr[i, 1]):
+            # return loss position
+            # print('Particle lost at: {}mm'.format(arr[i, 2]))
+            return (arr[i, 2], arr[i, 4])
+
+
 def plot_data(arr, filename):
-    plt.plot(arr[:, 3], arr[:, 4], 'r-')
-    plt.plot(arr[:, 3], arr[:, 5], 'b-.')
-    plt.plot(arr[:, 3], arr[:, 6], 'g-')
+    loss_z, loss_up = check_particle_loss(arr)
+    plt.plot(arr[:, 3], arr[:, 4], 'g-')
+    plt.plot(arr[:, 3], arr[:, 6], 'b-.')
+    plt.plot(arr[:, 3], arr[:, 5], 'g-')
+    plt.plot(loss_z, loss_up, 'rv')
     plt.grid(True)
     plt.xlabel('Path [mm]')
     plt.ylabel('Offset [mm]')
     plt.title(filename)
     plt.show()
+
+
+def save_to_file(arr):
+    np.savetxt('array.txt', arr, delimiter=',')
 
 
 def main():
@@ -126,6 +141,9 @@ def main():
     # check the first switches
 
     filename = args.filename[0]
+    if not os.path.exists(filename):
+        print('Please enter a valid filename.')
+        return
 
     if args.loop and args.plot:
         parser.print_help()
@@ -136,9 +154,9 @@ def main():
 
     if args.plot:
         arr = get_data_from_result_file(filename)
-        # print(arr)
+        # save_to_file(arr)
+        # check_particle_loss(arr)
         plot_data(arr, filename)
-        # np.savetxt('array.txt', arr, delimiter=',')
 
 
 # --------------------
