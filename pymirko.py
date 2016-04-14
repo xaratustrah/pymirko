@@ -6,20 +6,20 @@ MIRKO post processing tools
 
 """
 
-import sys, os, argparse
+import sys, os, argparse, glob
 from subprocess import call
 import numpy as np
 import matplotlib.pyplot as plt
 import fortranformat as ff
 
 MIRKO = 'mirko'
-EVET_LOOPS = 2
-N_TURNS = 50
-MIX_FILE = 'origin.mix'
+EVET_LOOPS = 3
+N_TURNS = 5
+MIX_FILE = 'esr_2016-04.mix'
 TEMP_FILENAME = 'temp.mak'
 MIXFILE_PLACEHOLDER = 'MIXFILE_PLACEHOLDER'
 PLACEHOLDER = 'NUMBERPLACEHOLDER'
-LAST_RING_ELEMENT = 355
+LAST_RING_ELEMENT = 330
 
 
 def get_apreture_dic():
@@ -28,23 +28,33 @@ def get_apreture_dic():
     with open(MIX_FILE) as f:
         for _ in range(31):
             next(f)
-        for i in range(355):
+        # for i in range(LAST_RING_ELEMENT):
+        while True:
             try:
                 line = f.readline()
+                if not line:
+                    break
                 hh = ffline.read(line)
-                if hh[0].strip() == '':
-                    name = 'DRIFT'
+                device_type = int(hh[2])
+                if device_type == 2:
+                    # this is a drift space, ignore it
+                    continue
+                    # name = 'DRIFT'
                 else:
                     name = hh[0].strip()
                 aperture = hh[6]
                 if name not in dic:
                     dic.update({name: aperture})
+                    # print('{},\t{},\t,{}\n'.format(name, device_type, aperture))
+                    # if aperture == 0:
+                    #    print(name)
             except:
                 pass
     return dic
 
 
 def loop_mirko(generator_filename):
+    print('Using MIX file {}.'.format(MIX_FILE))
     for i in range(1, EVET_LOOPS + 1):
         create_mak_file(i, generator_filename, N_TURNS)
         cmd = MIRKO.split()
@@ -76,6 +86,9 @@ def create_mak_file(current_idx, generator_filename, n_turns=1):
 def get_data_from_result_file(filename):
     dic = get_apreture_dic()
     arr = np.array([])
+    arr_of_z_at_ends = np.array([])
+
+    current_turn_number = 1
     z_at_end = 0
     with open(filename) as f:
         for line in f:
@@ -85,49 +98,116 @@ def get_data_from_result_file(filename):
             try:
                 number = int(s[-6])
                 z = float(s[-4])
+                # add the circumference BEFORE checking last element
+                z_cont = z + z_at_end
+                # check for last element now
                 if number == LAST_RING_ELEMENT:
                     # this is really cool:
                     z_at_end += z
-                z_cont = z + z_at_end
+                    arr_of_z_at_ends = np.append(arr_of_z_at_ends, z_at_end)
+                    current_turn_number += 1
                 up = float(s[-3])
                 down = float(s[-2])
                 ref = float(s[-1])
                 # do this one at last, to make advantage of try/except block
                 aperture = dic[s[-5].strip()]
-                arr = np.append(arr, (number, aperture, z, z_cont, up, down, ref))
+                arr = np.append(arr, (number, aperture, z, z_cont, up, down, ref, current_turn_number))
+
             except(ValueError, IndexError, KeyError):
                 # boah!
                 pass
-    arr = np.reshape(arr, (int(len(arr)) / 7, 7))
+    arr = np.reshape(arr, (int(len(arr)) / 8, 8))
 
-    return arr
+    return arr, arr_of_z_at_ends
 
 
 def check_particle_loss(arr):
+    el_number = 0
+    loss_z_cont = 0
+    loss_ref = 0
+    current_turn_number = 0
     for i in range(np.shape(arr)[0]):
         # check if the particle hits the aperture
         if arr[i, 4] >= arr[i, 1] or arr[i, 5] < (-1 * arr[i, 1]):
-            # return loss position
-            # print('Particle lost at: {}mm'.format(arr[i, 2]))
-            return (arr[i, 0], arr[i, 2], arr[i, 4])
+            # determine loss position using z_cont
+            el_number, loss_z_cont, loss_ref, current_turn_number = int(arr[i, 0]), arr[i, 3], arr[i, 6], int(arr[i, 7])
+    return el_number, loss_z_cont, loss_ref, current_turn_number
 
 
-def plot_data(arr, filename):
-    number, loss_z, loss_up = check_particle_loss(arr)
-    plt.plot(arr[:, 3], arr[:, 4], 'g-')
-    plt.plot(arr[:, 3], arr[:, 6], 'b-.')
-    plt.plot(arr[:, 3], arr[:, 5], 'g-')
-    plt.plot(loss_z, loss_up, 'rv')
-    print(number)
-    plt.grid(True)
-    plt.xlabel('Path [mm]')
-    plt.ylabel('Offset [mm]')
-    plt.title(filename)
-    plt.show()
+def check_particle_at_element(arr, element_number, element_x_min, element_x_max):
+    pock_z = np.array([])
+    pock_x = np.array([])
+    current_turn_number_array = np.array([])
+
+    for i in range(np.shape(arr)[0]):
+        # check the position of particle at a specific element
+        if arr[i, 0] == element_number:
+            pock_z = np.append(pock_z, arr[i, 3])
+            current_turn_number_array = np.append(current_turn_number_array, arr[i, 7])
+            if arr[i, 6] >= element_x_min and arr[i, 6] <= element_x_max:
+                print('Turn {}: Particle hits pocket detector (element number {} at {}mm).'.format(int(arr[i, 7]),
+                                                                                                   element_number,
+                                                                                                   arr[i, 6]))
+                pock_x = np.append(pock_x, arr[i, 6])
+                # we already found a hit, so quit
+                break
+            else:
+                print('Turn {}: Particle misses pocket detector (element number {}).'.format(int(arr[i, 7]),
+                                                                                             element_number))
+                pock_x = np.append(pock_x, 0)
+    return pock_z, pock_x, current_turn_number_array
 
 
 def save_to_file(arr):
-    np.savetxt('array.txt', arr, delimiter=',')
+    np.savetxt('result_array.txt', arr, delimiter=',')
+
+
+# --------------------
+
+def plot_data(arr, arr_of_z_at_ends, filename):
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+
+    # plot lines first
+    ax.plot(arr[:, 3], arr[:, 4], 'g-')
+    ax.plot(arr[:, 3], arr[:, 6], 'b-.')
+    ax.plot(arr[:, 3], arr[:, 5], 'g-')
+
+    # plot vertical lines for turns
+    for i in range(len(arr_of_z_at_ends)):
+        plt.axvline(arr_of_z_at_ends[i], color='b', linestyle='--')
+
+    # find loss point
+    el_number, loss_z_cont, loss_ref, current_turn_number = check_particle_loss(arr)
+    if el_number == 0 and loss_z_cont == 0 and loss_ref == 0:
+        print('Particle would survive for all turns if no pocket detectors were inside.')
+    else:
+        print('Particle is lost at element number.'.format(el_number))
+        ax.plot(loss_z_cont, loss_ref, 'rv')
+
+    # check position at pocket detector which is element 229
+    pock_z, pock_x, current_turn_number_array = check_particle_at_element(arr, 229, 22, 82)
+    for i in range(len(pock_z)):
+        ax.axvline(pock_z[i], color='r', linestyle='--')
+
+        if pock_x[i] != 0:
+            ax.plot(pock_z[i], pock_x[i], 'rD')
+            ax.annotate('Pocket detector hit (turn {})'.format(int(current_turn_number_array[i])),
+                        xy=(pock_z[i], pock_x[i]), xytext=(0.4, 0.8),
+                        textcoords='figure fraction',
+                        xycoords='data',
+                        arrowprops=dict(width=1, headwidth=5, edgecolor='blue', facecolor='blue', shrink=0.05))
+        else:
+            ax.plot(pock_z[i], pock_x[i], 'rx')
+
+    # finalize the plot
+    plt.grid(True)
+    plt.xlabel('Path [mm]')
+    plt.ylabel('Offset [mm]')
+    filename_wo_ext = os.path.splitext(filename)[0]
+    plt.title(filename_wo_ext)
+    fig.savefig(os.path.splitext(filename_wo_ext)[0] + '.png', dpi=400)
+    #plt.show()
 
 
 def main():
@@ -136,6 +216,8 @@ def main():
 
     parser.add_argument('--loop', action='store_true', help='Loop MIRKO.')
     parser.add_argument('--plot', action='store_true', help='Plot results file.')
+    parser.add_argument('--check', action='store_true', help='Only check misses and hits.')
+    parser.add_argument('--many', action='store_true', help='Plot loop.')
     parser.add_argument('filename', nargs=1, type=str, help='Input file name.')
 
     args = parser.parse_args()
@@ -154,10 +236,20 @@ def main():
         loop_mirko(filename)
 
     if args.plot:
-        arr = get_data_from_result_file(filename)
-        # save_to_file(arr)
-        # check_particle_loss(arr)
-        plot_data(arr, filename)
+        arr, arr_of_z_at_ends = get_data_from_result_file(filename)
+        save_to_file(arr)
+        plot_data(arr, arr_of_z_at_ends, filename)
+
+    if args.check:
+        arr, _ = get_data_from_result_file(filename)
+        check_particle_at_element(arr, 229, 22, 82)
+
+    if args.many:
+        for file in glob.glob("event*.txt"):
+            print(file)
+            arr, arr_of_z_at_ends = get_data_from_result_file(file)
+            #check_particle_at_element(arr, 229, 22, 82)
+            plot_data(arr, arr_of_z_at_ends, file)
 
 
 # --------------------
