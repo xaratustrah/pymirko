@@ -13,12 +13,14 @@ import matplotlib.pyplot as plt
 import fortranformat as ff
 
 MIRKO = 'mirko'
-EVET_LOOPS = 3
-N_TURNS = 5
+EVET_LOOPS = 10
+N_TURNS = 3
 MIX_FILE = 'esr_2016-04.mix'
 TEMP_FILENAME = 'temp.mak'
 MIXFILE_PLACEHOLDER = 'MIXFILE_PLACEHOLDER'
 PLACEHOLDER = 'NUMBERPLACEHOLDER'
+FILENAME_PLACEHOLDER = 'FILENAME_PLACEHOLDER'
+
 LAST_RING_ELEMENT = 330
 
 
@@ -75,7 +77,8 @@ def create_mak_file(current_idx, generator_filename, n_turns=1):
 
     with open(TEMP_FILENAME, 'w') as f:
         new_head = header_section.replace(PLACEHOLDER, '{}'.format(current_idx)).replace(MIXFILE_PLACEHOLDER,
-                                                                                         '{}'.format(MIX_FILE))
+                                                                                         '{}'.format(MIX_FILE)).replace(
+            FILENAME_PLACEHOLDER, 'result_at_{:03d}.txt'.format(current_idx))
         f.write(new_head)
         for i in range(n_turns):
             f.write(repeat_section)
@@ -207,7 +210,7 @@ def plot_data(arr, arr_of_z_at_ends, filename):
     filename_wo_ext = os.path.splitext(filename)[0]
     plt.title(filename_wo_ext)
     fig.savefig(os.path.splitext(filename_wo_ext)[0] + '.png', dpi=400)
-    #plt.show()
+    # plt.show()
 
 
 def main():
@@ -245,10 +248,10 @@ def main():
         check_particle_at_element(arr, 229, 22, 82)
 
     if args.many:
-        for file in glob.glob("event*.txt"):
+        for file in glob.glob("result_at_*.txt"):
             print(file)
             arr, arr_of_z_at_ends = get_data_from_result_file(file)
-            #check_particle_at_element(arr, 229, 22, 82)
+            # check_particle_at_element(arr, 229, 22, 82)
             plot_data(arr, arr_of_z_at_ends, file)
 
 

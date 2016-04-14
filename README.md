@@ -6,7 +6,7 @@ Python tools for post processing of **MIRKO** results.
 
 ####About
 
-`mirko` is a fortran based powerful (albeit **closed source**) optics program for designing particle accelerators and storage rings. This repository **does not** contain the source code for `mirko`. It only contains python tools for automatic execution and post processing of the calculation results. `pymirko` allows:
+`mirko` is a fortran based powerful (albeit **closed source**) optics program developed by **B.J. Franczak** for designing particle accelerators and storage rings. This repository **does not** contain any source code for `mirko` or related projects. It only contains python tools for automatic execution and post processing of the calculation results. `pymirko` allows:
 
 * run `mirko` for arbitrary number of turns around the storage ring and get a single result
 * determine particle losses after decay due to aperture
@@ -16,7 +16,7 @@ Python tools for post processing of **MIRKO** results.
 
 #### Installation
 
-The Java version of `mirko` needs to be installed properly in order for `pymirko` to work. You need a working Java installation as well. Under OSX `libjmirko.dylib` must be available in one of the following places (Java library paths):
+The Java version of `mirko`, also known as **jMirko** is needed to be installed properly in order for `pymirko` to work. You need a working Java installation as well. Under OSX `libjmirko.dylib` must be available in one of the following places (Java library paths):
 
     /Users/XXXX/Library/Java/Extensions
     /Library/Java/Extensions
@@ -32,5 +32,8 @@ I personally choose the first one. You can create a run script and call it `mirk
 
 Then you can give execution permission and put it in the path, e.g. in `/opt/local/bin/`.
 
-Enjoy.
-:-)
+
+#### References
+
+* B. Franczak, Computer controlled beam alignment for the GSI therapy project, [LINK](http://accelconf.web.cern.ch/AccelConf/e98/PAPERS/WEP07C.PDF)
+* [MIRKO](https://www.gsi.de/en/work/fairgsi/primary_beams/system_planning/projects_pbsp/mirko.htm) page at [GSI](http://www.gsi.de)
