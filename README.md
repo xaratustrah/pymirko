@@ -35,5 +35,5 @@ Then you can give execution permission and put it in the path, e.g. in `/opt/loc
 
 #### References
 
-* B. Franczak, Computer controlled beam alignment for the GSI therapy project, [LINK](http://accelconf.web.cern.ch/AccelConf/e98/PAPERS/WEP07C.PDF)
+* B. Franczak, MIRKO - An Interactive Program for Beam Lines and Synchrotrons, Computing in Accelerator Design and Operation, Proceedings, Berlin 1983 [LINK](http://dx.doi.org/10.1007/3540139095_102).
 * [MIRKO](https://www.gsi.de/en/work/fairgsi/primary_beams/system_planning/projects_pbsp/mirko.htm) page at [GSI](http://www.gsi.de)
